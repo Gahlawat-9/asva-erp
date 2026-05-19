@@ -11,7 +11,7 @@ export function AppHeader() {
         <span className="font-semibold">Factory ERP</span>
         {user && (
           <span className="ml-2">
-            : [CHEM] {user.company} : User : {user.displayName}
+            :  {user.company} : User : {user.displayName}
           </span>
         )}
       </div>

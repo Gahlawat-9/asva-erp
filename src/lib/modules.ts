@@ -53,7 +53,19 @@ export const MODULES: ModuleDef[] = [
 export interface ModuleAction {
   label: string;
   icon: LucideIcon;
-  action: "pr" | "mrr" | "options" | "exit";
+  action:
+    | "pr"
+    | "mrr"
+    | "options"
+    | "exit"
+    | "production-plan"
+    | "bom-master"
+    | "work-order"
+    | "stock-master"
+    | "stock-ledger"
+    | "issue"
+    | "finished-goods"
+    | "dispatch";
 }
 
 export function getModuleActions(id: ModuleId): ModuleAction[] {
@@ -78,23 +90,59 @@ export function getModuleActions(id: ModuleId): ModuleAction[] {
         { label: "Exit", icon: LogOut, action: "exit" },
       ];
     case "inventory":
-      return [
-        { label: "Stock Master", icon: Boxes, action: "options" },
-        { label: "Stock Ledger", icon: Layers, action: "options" },
-        { label: "Stock Summary", icon: PackageCheck, action: "options" },
-        { label: "MRR Entry", icon: Truck, action: "mrr" },
-        { label: "Issue", icon: FileText, action: "options" },
-        { label: "Reports", icon: FileBarChart, action: "options" },
-        { label: "Exit", icon: LogOut, action: "exit" },
-      ];
+  return [
+    {
+      label: "Stock Master",
+      icon: Boxes,
+      action: "stock-master",
+    },
+    {
+      label: "Stock Ledger",
+      icon: Layers,
+      action: "stock-ledger",
+    },
+    {
+      label: "Stock Summary",
+      icon: PackageCheck,
+      action: "options",
+    },
+    {
+      label: "MRR Entry",
+      icon: Truck,
+      action: "mrr",
+    },
+    {
+      label: "Issue",
+      icon: FileText,
+      action: "issue",
+    },];
     case "manufacturing":
-      return [
-        { label: "Production Plan", icon: Factory, action: "options" },
-        { label: "Work Orders", icon: FileText, action: "options" },
-        { label: "BOM Master", icon: FolderOpen, action: "options" },
-        { label: "Reports", icon: FileBarChart, action: "options" },
-        { label: "Exit", icon: LogOut, action: "exit" },
-      ];
+  return [
+    {
+      label: "Production Plan",
+      icon: Factory,
+      action: "production-plan",
+    },
+    {
+      label: "Work Order",
+      icon: FileText,
+      action: "work-order",
+    },
+    {
+      label: "BOM Master",
+      icon: FolderOpen,
+      action: "bom-master",
+    },
+  {
+  label: "Finished Goods",
+  icon: PackageCheck,
+  action: "finished-goods",
+},
+{
+  label: "Dispatch",
+  icon: Truck,
+  action: "dispatch",
+},];
     case "sales":
       return [
         { label: "Sales Order", icon: ShoppingCart, action: "options" },

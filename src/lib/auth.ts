@@ -25,14 +25,14 @@ export interface User {
 const USERS: Record<string, { password: string; user: User }> = {
   admin: {
     password: "admin",
-    user: { username: "admin", displayName: "admin", company: "CHEM ENGINEERS", modules: "all" },
+    user: { username: "admin", displayName: "admin", company: "ASVA", modules: "all" },
   },
   rahul: {
     password: "rahul",
     user: {
       username: "rahul",
       displayName: "Rahul (Purchase Dept.)",
-      company: "CHEM ENGINEERS",
+      company: "ASVA",
       modules: ["purchase", "inventory"],
     },
   },
@@ -41,8 +41,17 @@ const USERS: Record<string, { password: string; user: User }> = {
     user: {
       username: "finance",
       displayName: "Anita (Finance)",
-      company: "CHEM ENGINEERS",
+      company: "ASVA",
       modules: ["finance", "gst", "mis"],
+    },
+  },
+  production: {
+    password: "production",
+    user: {
+      username: "production",
+      displayName: "Aman (Manufacturing)",
+      company: "ASVA",
+      modules: ["manufacturing"],
     },
   },
 };
