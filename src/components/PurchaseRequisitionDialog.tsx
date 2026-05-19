@@ -25,6 +25,9 @@ interface PR {
   closed: "Y" | "N";
   items: PRItem[];
   remarksCond: string;
+  status?: "pending" | "approved";
+  approvedBy?: string;
+  approvedAt?: string;
 }
 
 const STORAGE = "factory_prs";
@@ -63,6 +66,7 @@ function blankPR(existing: PR[], indenter: string): PR {
     closed: "N",
     items: [emptyItem()],
     remarksCond: "",
+    status: "pending",
   };
 }
 
@@ -91,17 +95,32 @@ export function PurchaseRequisitionDialog({
 
   if (!current) return null;
 
+  const isAdmin = user?.username === "admin";
+  const status: "pending" | "approved" = current.status ?? "pending";
+  const isApproved = status === "approved";
+  const lockEdits = isApproved || (isAdmin && isExisting);
+
   const updateItem = (i: number, patch: Partial<PRItem>) => {
+    if (lockEdits) return;
     setCurrent({ ...current, items: current.items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)) });
   };
-  const addRow = () => setCurrent({ ...current, items: [...current.items, emptyItem()] });
-  const removeRow = (i: number) =>
+  const addRow = () => {
+    if (lockEdits) return;
+    setCurrent({ ...current, items: [...current.items, emptyItem()] });
+  };
+  const removeRow = (i: number) => {
+    if (lockEdits) return;
     setCurrent({
       ...current,
       items: current.items.length > 1 ? current.items.filter((_, idx) => idx !== i) : [emptyItem()],
     });
+  };
 
   const handleSave = () => {
+    if (isApproved) {
+      toast.error("Approved P.R. cannot be modified");
+      return;
+    }
     if (!current.dept.trim()) {
       toast.error("Please enter the Department");
       return;
@@ -110,13 +129,30 @@ export function PurchaseRequisitionDialog({
       toast.error("Add at least one item");
       return;
     }
+    const toSave: PR = { ...current, status: current.status ?? "pending" };
     const next = isExisting
-      ? prs.map((p) => (p.prNo === current.prNo ? current : p))
-      : [...prs, current];
+      ? prs.map((p) => (p.prNo === toSave.prNo ? toSave : p))
+      : [...prs, toSave];
     savePRs(next);
     setPrs(next);
+    setCurrent(toSave);
     setIsExisting(true);
     toast.success(`P.R. ${current.prNo} saved`);
+  };
+
+  const handleApprove = () => {
+    if (!isAdmin || !isExisting) return;
+    const approved: PR = {
+      ...current,
+      status: "approved",
+      approvedBy: user?.username ?? "admin",
+      approvedAt: todayStr(),
+    };
+    const next = prs.map((p) => (p.prNo === approved.prNo ? approved : p));
+    savePRs(next);
+    setPrs(next);
+    setCurrent(approved);
+    toast.success(`P.R. ${approved.prNo} approved`);
   };
 
   const handleNew = () => {
@@ -127,6 +163,10 @@ export function PurchaseRequisitionDialog({
   };
 
   const handleDelete = () => {
+    if (isApproved) {
+      toast.error("Approved P.R. cannot be deleted");
+      return;
+    }
     if (!isExisting) {
       handleNew();
       return;
@@ -152,7 +192,9 @@ export function PurchaseRequisitionDialog({
         </DialogHeader>
         <div className="grid grid-cols-[220px_1fr] min-h-[480px]">
           <aside className="border-r bg-white p-3 overflow-y-auto">
-            <h3 className="font-semibold text-sm border-b pb-2 mb-2">Saved P.R.s</h3>
+            <h3 className="font-semibold text-sm border-b pb-2 mb-2">
+              {isAdmin ? "All P.R.s (Admin)" : "Saved P.R.s"}
+            </h3>
             {prs.length === 0 ? (
               <p className="text-xs text-muted-foreground">No records</p>
             ) : (
@@ -165,7 +207,18 @@ export function PurchaseRequisitionDialog({
                         current.prNo === p.prNo && isExisting ? "bg-accent font-semibold" : ""
                       }`}
                     >
-                      {p.prNo} — {p.dept || "(no dept)"}
+                      <div className="flex items-center justify-between gap-2">
+                        <span>{p.prNo} — {p.dept || "(no dept)"}</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded ${
+                            p.status === "approved"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {p.status === "approved" ? "Approved" : "Pending"}
+                        </span>
+                      </div>
                     </button>
                   </li>
                 ))}
@@ -174,7 +227,24 @@ export function PurchaseRequisitionDialog({
           </aside>
 
           <section className="p-4 flex flex-col gap-3">
-            <h2 className="text-lg font-semibold underline">Purchase Requisition</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold underline">Purchase Requisition</h2>
+              {isExisting && (
+                <span
+                  className={`text-xs px-2 py-1 rounded font-medium ${
+                    isApproved
+                      ? "bg-green-100 text-green-700 border border-green-300"
+                      : "bg-yellow-100 text-yellow-800 border border-yellow-300"
+                  }`}
+                >
+                  {isApproved
+                    ? `Approved by ${current.approvedBy ?? "admin"}${
+                        current.approvedAt ? ` on ${current.approvedAt}` : ""
+                      }`
+                    : "Pending admin approval"}
+                </span>
+              )}
+            </div>
 
             <div className="grid grid-cols-[80px_180px_60px_180px_1fr_60px_220px] items-center gap-2 text-sm">
               <label>P.R. No.</label>
@@ -304,10 +374,21 @@ export function PurchaseRequisitionDialog({
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button variant="outline" onClick={handleNew}>New</Button>
-              <Button onClick={handleSave}>Save</Button>
+              {!isAdmin && (
+                <>
+                  <Button variant="outline" onClick={handleNew}>New</Button>
+                  <Button onClick={handleSave} disabled={isApproved}>Save</Button>
+                </>
+              )}
               <Button variant="outline" onClick={() => window.print()}>Print</Button>
-              <Button variant="outline" onClick={handleDelete}>Delete</Button>
+              {isAdmin && isExisting && !isApproved && (
+                <Button onClick={handleApprove} className="bg-green-600 hover:bg-green-700 text-white">
+                  Approve P.R.
+                </Button>
+              )}
+              {!isAdmin && (
+                <Button variant="outline" onClick={handleDelete} disabled={isApproved}>Delete</Button>
+              )}
               <Button
                 variant="destructive"
                 onClick={() => onOpenChange(false)}
