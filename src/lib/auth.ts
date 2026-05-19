@@ -33,7 +33,7 @@ const USERS: Record<string, { password: string; user: User }> = {
       username: "rahul",
       displayName: "Rahul (Purchase Dept.)",
       company: "CHEM ENGINEERS",
-      modules: ["purchase", "inventory", "quality"],
+      modules: ["purchase", "inventory"],
     },
   },
   finance: {
