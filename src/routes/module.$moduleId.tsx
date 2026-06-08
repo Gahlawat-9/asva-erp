@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { getModuleActions, getModuleLabel, MODULES } from "@/lib/modules";
 import { getUser, hasModule, type ModuleId } from "@/lib/auth";
 import { PurchaseRequisitionDialog } from "@/components/PurchaseRequisitionDialog";
+import { PurchaseOrderDialog } from "@/components/PurchaseOrderDialog";
 import { PlaceholderDialog } from "@/components/PlaceholderDialog";
 import { MRREntryDialog } from "@/components/MRREntryDialog";
 import { StockMasterDialog } from "@/components/StockMasterDialog";
@@ -45,6 +46,7 @@ function ModulePage() {
   const label = getModuleLabel(id);
 
   const [prOpen, setPrOpen] = useState(false);
+  const [poOpen, setPoOpen] = useState(false);
   const [mrrOpen, setMrrOpen] = useState(false);
   const [productionPlanOpen, setProductionPlanOpen] = useState(false);
   const [stockOpen, setStockOpen] = useState(false);
@@ -77,6 +79,10 @@ function ModulePage() {
 }
 else if (a.action === "pr") {
   setPrOpen(true);
+}
+
+else if (a.action === "po") {
+  setPoOpen(true);
 }
 else if (a.action === "mrr") {
   setMrrOpen(true);
@@ -139,6 +145,11 @@ else {
       <PurchaseRequisitionDialog
   open={prOpen}
   onOpenChange={setPrOpen}
+/>
+
+<PurchaseOrderDialog
+  open={poOpen}
+  onOpenChange={setPoOpen}
 />
 
 <MRREntryDialog

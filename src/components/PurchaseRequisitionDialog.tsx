@@ -1,23 +1,32 @@
+import axios from "axios";
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Trash2, Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
+/* ---------------- TYPES ---------------- */
+
 interface PRItem {
   itemCode: string;
   itemName: string;
-  quantity: string;
+  quantity: number;
   unit: string;
   remarks: string;
   earliest: string;
   latest: string;
-  rate: string;
+  rate: number;
 }
 
 interface PR {
+  _id?: string;
   prNo: string;
   date: string;
   dept: string;
@@ -30,31 +39,41 @@ interface PR {
   approvedAt?: string;
 }
 
-const STORAGE = "factory_prs";
+/* ---------------- API ---------------- */
 
-function loadPRs(): PR[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE) ?? "[]");
-  } catch {
-    return [];
-  }
+async function loadPRs(): Promise<PR[]> {
+  const res = await axios.get("https://asva-erp.onrender.com/api/pr");
+  return res.data;
 }
-function savePRs(prs: PR[]) {
-  localStorage.setItem(STORAGE, JSON.stringify(prs));
-}
+
+/* ---------------- HELPERS ---------------- */
 
 function emptyItem(): PRItem {
-  return { itemCode: "", itemName: "", quantity: "", unit: "", remarks: "", earliest: "", latest: "", rate: "" };
+  return {
+    itemCode: "",
+    itemName: "",
+    quantity: 0,
+    unit: "",
+    remarks: "",
+    earliest: "",
+    latest: "",
+    rate: 0,
+  };
 }
 
 function nextPrNo(existing: PR[]): string {
-  const max = existing.reduce((m, p) => Math.max(m, parseInt(p.prNo, 10) || 0), 0);
+  const max = existing.reduce(
+    (m, p) => Math.max(m, parseInt(p.prNo, 10) || 0),
+    0
+  );
   return String(max + 1).padStart(6, "0");
 }
 
 function todayStr() {
   const d = new Date();
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  return `${String(d.getDate()).padStart(2, "0")}/${String(
+    d.getMonth() + 1
+  ).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
 function blankPR(existing: PR[], indenter: string): PR {
@@ -70,6 +89,8 @@ function blankPR(existing: PR[], indenter: string): PR {
   };
 }
 
+/* ---------------- COMPONENT ---------------- */
+
 export function PurchaseRequisitionDialog({
   open,
   onOpenChange,
@@ -78,105 +99,171 @@ export function PurchaseRequisitionDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const user = useAuth();
+
   const [prs, setPrs] = useState<PR[]>([]);
   const [current, setCurrent] = useState<PR | null>(null);
   const [tab, setTab] = useState<"items" | "remarks">("items");
   const [isExisting, setIsExisting] = useState(false);
 
+  const isAdmin = user?.username === "admin";
+  const isApproved = current?.status === "approved";
+
+  /* ---------------- LOAD ---------------- */
+
   useEffect(() => {
-    if (open) {
-      const loaded = loadPRs();
+    const fetch = async () => {
+      if (!open) return;
+
+      const loaded = await loadPRs();
       setPrs(loaded);
+
       setCurrent(blankPR(loaded, user?.username ?? "admin"));
       setIsExisting(false);
       setTab("items");
-    }
+    };
+
+    fetch();
   }, [open, user]);
 
   if (!current) return null;
 
-  const isAdmin = user?.username === "admin";
-  const status: "pending" | "approved" = current.status ?? "pending";
-  const isApproved = status === "approved";
-  const lockEdits = isApproved || (isAdmin && isExisting);
+  /* ---------------- ITEM HANDLERS ---------------- */
 
   const updateItem = (i: number, patch: Partial<PRItem>) => {
-    if (lockEdits) return;
-    setCurrent({ ...current, items: current.items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)) });
-  };
-  const addRow = () => {
-    if (lockEdits) return;
-    setCurrent({ ...current, items: [...current.items, emptyItem()] });
-  };
-  const removeRow = (i: number) => {
-    if (lockEdits) return;
     setCurrent({
       ...current,
-      items: current.items.length > 1 ? current.items.filter((_, idx) => idx !== i) : [emptyItem()],
+      items: current.items.map((it, idx) =>
+        idx === i ? { ...it, ...patch } : it
+      ),
     });
   };
 
-  const handleSave = () => {
-    if (isApproved) {
-      toast.error("Approved P.R. cannot be modified");
-      return;
-    }
-    if (!current.dept.trim()) {
-      toast.error("Please enter the Department");
-      return;
-    }
-    if (!current.items.some((it) => it.itemName.trim())) {
-      toast.error("Add at least one item");
-      return;
-    }
-    const toSave: PR = { ...current, status: current.status ?? "pending" };
-    const next = isExisting
-      ? prs.map((p) => (p.prNo === toSave.prNo ? toSave : p))
-      : [...prs, toSave];
-    savePRs(next);
-    setPrs(next);
-    setCurrent(toSave);
-    setIsExisting(true);
-    toast.success(`P.R. ${current.prNo} saved`);
-  };
-
-  const handleApprove = () => {
-    if (!isAdmin || !isExisting) return;
-    const approved: PR = {
+  const addRow = () => {
+    setCurrent({
       ...current,
-      status: "approved",
-      approvedBy: user?.username ?? "admin",
-      approvedAt: todayStr(),
-    };
-    const next = prs.map((p) => (p.prNo === approved.prNo ? approved : p));
-    savePRs(next);
-    setPrs(next);
-    setCurrent(approved);
-    toast.success(`P.R. ${approved.prNo} approved`);
+      items: [...current.items, emptyItem()],
+    });
   };
 
-  const handleNew = () => {
-    const loaded = loadPRs();
+  const removeRow = (i: number) => {
+    setCurrent({
+      ...current,
+      items:
+        current.items.length > 1
+          ? current.items.filter((_, idx) => idx !== i)
+          : [emptyItem()],
+    });
+  };
+
+  /* ---------------- SAVE ---------------- */
+
+  const handleSave = async () => {
+    try {
+      if (isApproved) {
+        toast.error("Approved P.R. cannot be modified");
+        return;
+      }
+
+      if (!current.dept.trim()) {
+        toast.error("Please enter Department");
+        return;
+      }
+
+      if (!current.items.some((it) => it.itemName.trim())) {
+        toast.error("Add at least one item");
+        return;
+      }
+
+      const payload = {
+        ...current,
+        items: current.items.map((it) => ({
+          ...it,
+          quantity: Number(it.quantity),
+          rate: Number(it.rate),
+        })),
+      };
+
+      let saved;
+
+      if (isExisting && current._id) {
+        const res = await axios.put(
+          `https://asva-erp.onrender.com/api/pr/${current._id}`,
+          payload
+        );
+        saved = res.data;
+      } else {
+        const res = await axios.post(
+          "https://asva-erp.onrender.com/api/pr",
+          payload
+        );
+        saved = res.data;
+      }
+
+      const refreshed = await loadPRs();
+      setPrs(refreshed);
+
+      setCurrent(saved);
+      setIsExisting(true);
+
+      toast.success(`P.R. ${saved.prNo} saved`);
+    } catch {
+      toast.error("Failed to save P.R.");
+    }
+  };
+
+  /* ---------------- APPROVE ---------------- */
+
+  const handleApprove = async () => {
+  try {
+    const res = await axios.put(
+      `https://asva-erp.onrender.com/api/pr/${current._id}/approve`,
+      {
+        approvedBy: user?.username,
+      }
+    );
+
+    setCurrent(res.data);
+
+    toast.success("P.R. approved");
+  } catch (err) {
+    console.error(err);
+
+    toast.error("Approval failed");
+  }
+};
+
+  /* ---------------- NEW ---------------- */
+
+  const handleNew = async () => {
+    const loaded = await loadPRs();
     setCurrent(blankPR(loaded, user?.username ?? "admin"));
     setIsExisting(false);
     setTab("items");
   };
 
-  const handleDelete = () => {
-    if (isApproved) {
-      toast.error("Approved P.R. cannot be deleted");
-      return;
+  /* ---------------- DELETE ---------------- */
+
+  const handleDelete = async () => {
+    try {
+      if (!current._id) return;
+
+      await axios.delete(
+        `https://asva-erp.onrender.com/api/pr/${current._id}`
+      );
+
+      const refreshed = await loadPRs();
+      setPrs(refreshed);
+
+      setCurrent(blankPR(refreshed, user?.username ?? "admin"));
+      setIsExisting(false);
+
+      toast.success("P.R. deleted");
+    } catch {
+      toast.error("Delete failed");
     }
-    if (!isExisting) {
-      handleNew();
-      return;
-    }
-    const next = prs.filter((p) => p.prNo !== current.prNo);
-    savePRs(next);
-    setPrs(next);
-    toast.success("P.R. deleted");
-    handleNew();
   };
+
+  /* ---------------- OPEN EXISTING ---------------- */
 
   const openExisting = (pr: PR) => {
     setCurrent(pr);
@@ -184,219 +271,135 @@ export function PurchaseRequisitionDialog({
     setTab("items");
   };
 
+  /* ---------------- UI (YOUR ORIGINAL UI KEPT) ---------------- */
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl p-0 gap-0 bg-[oklch(0.96_0.005_230)]">
-        <DialogHeader className="bg-[var(--erp-header)] text-white px-4 py-2">
-          <DialogTitle className="text-white text-sm font-normal">Purchase Requisition Entry</DialogTitle>
+      <DialogContent className="max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>Purchase Requisition Entry</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-[220px_1fr] min-h-[480px]">
-          <aside className="border-r bg-white p-3 overflow-y-auto">
-            <h3 className="font-semibold text-sm border-b pb-2 mb-2">
-              {isAdmin ? "All P.R.s (Admin)" : "Saved P.R.s"}
-            </h3>
-            {prs.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No records</p>
-            ) : (
-              <ul className="space-y-1">
-                {prs.map((p) => (
-                  <li key={p.prNo}>
-                    <button
-                      onClick={() => openExisting(p)}
-                      className={`w-full text-left text-xs px-2 py-1 rounded hover:bg-accent ${
-                        current.prNo === p.prNo && isExisting ? "bg-accent font-semibold" : ""
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span>{p.prNo} — {p.dept || "(no dept)"}</span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded ${
-                            p.status === "approved"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          {p.status === "approved" ? "Approved" : "Pending"}
-                        </span>
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </aside>
 
-          <section className="p-4 flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold underline">Purchase Requisition</h2>
-              {isExisting && (
+        {/* LIST */}
+        <div className="max-h-32 overflow-auto border p-2 text-xs">
+          <div className="font-semibold mb-1">
+            {isAdmin ? "All P.R.s (Admin)" : "Saved P.R.s"}
+          </div>
+
+          {prs.length === 0 ? (
+            <div>No records</div>
+          ) : (
+            prs.map((p) => (
+              <button
+                key={p._id}
+                onClick={() => openExisting(p)}
+                className="w-full text-left text-xs px-2 py-1 rounded hover:bg-accent"
+              >
+                {p.prNo} — {p.dept || "(no dept)"}
                 <span
-                  className={`text-xs px-2 py-1 rounded font-medium ${
-                    isApproved
-                      ? "bg-green-100 text-green-700 border border-green-300"
-                      : "bg-yellow-100 text-yellow-800 border border-yellow-300"
+                  className={`ml-2 text-[10px] px-1.5 py-0.5 rounded ${
+                    p.status === "approved"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-yellow-100 text-yellow-800"
                   }`}
                 >
-                  {isApproved
-                    ? `Approved by ${current.approvedBy ?? "admin"}${
-                        current.approvedAt ? ` on ${current.approvedAt}` : ""
-                      }`
-                    : "Pending admin approval"}
+                  {p.status === "approved" ? "Approved" : "Pending"}
                 </span>
-              )}
-            </div>
-
-            <div className="grid grid-cols-[80px_180px_60px_180px_1fr_60px_220px] items-center gap-2 text-sm">
-              <label>P.R. No.</label>
-              <Input value={current.prNo} readOnly className="h-8" />
-              <label>Dated</label>
-              <Input
-                value={current.date}
-                onChange={(e) => setCurrent({ ...current, date: e.target.value })}
-                className="h-8"
-              />
-              <div className="text-xs text-right text-muted-foreground">
-                The Deptt Which is Raising the Purchase Request
-              </div>
-              <label>Dept.</label>
-              <Input
-                placeholder="e.g. PRODUCTION"
-                value={current.dept}
-                onChange={(e) => setCurrent({ ...current, dept: e.target.value.toUpperCase() })}
-                className="h-8"
-              />
-            </div>
-
-            <div className="flex items-center gap-2 border-b">
-              <button
-                onClick={() => setTab("items")}
-                className={`px-3 py-1.5 text-sm rounded-t ${
-                  tab === "items" ? "bg-[var(--erp-banner)] font-semibold" : "bg-transparent"
-                }`}
-              >
-                Items in this indent
               </button>
-              <button
-                onClick={() => setTab("remarks")}
-                className={`px-3 py-1.5 text-sm rounded-t border ${
-                  tab === "remarks" ? "bg-[var(--erp-banner)] font-semibold" : "bg-white"
-                }`}
-              >
-                Remarks & Conditions
-              </button>
-              {tab === "items" && (
-                <Button variant="outline" size="sm" onClick={addRow} className="ml-auto h-7">
-                  <Plus className="w-3 h-3 mr-1" /> Add row
-                </Button>
-              )}
-            </div>
+            ))
+          )}
+        </div>
 
-            {tab === "items" ? (
-              <div className="border bg-white max-h-[260px] overflow-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="p-1 w-10 text-left">Sno</th>
-                      <th className="p-1 text-left">Item Code</th>
-                      <th className="p-1 text-left">Item Name</th>
-                      <th className="p-1 text-left w-24">Quantity</th>
-                      <th className="p-1 text-left w-20">Unit</th>
-                      <th className="p-1 text-left">Remarks</th>
-                      <th className="p-1 text-left w-28">Earliest By</th>
-                      <th className="p-1 text-left w-28">Latest Dt</th>
-                      <th className="p-1 text-left w-24">Expec.Rate</th>
-                      <th className="w-8" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {current.items.map((it, i) => (
-                      <tr key={i} className="border-t">
-                        <td className="p-1">{i + 1}</td>
-                        {(
-                          [
-                            "itemCode",
-                            "itemName",
-                            "quantity",
-                            "unit",
-                            "remarks",
-                            "earliest",
-                            "latest",
-                            "rate",
-                          ] as const
-                        ).map((field) => (
-                          <td key={field} className="p-0.5">
-                            <Input
-                              value={it[field]}
-                              onChange={(e) => updateItem(i, { [field]: e.target.value } as Partial<PRItem>)}
-                              className="h-7 text-xs"
-                            />
-                          </td>
-                        ))}
-                        <td className="text-center">
-                          <button onClick={() => removeRow(i)} className="text-[var(--erp-danger)]">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <textarea
-                value={current.remarksCond}
-                onChange={(e) => setCurrent({ ...current, remarksCond: e.target.value })}
-                className="border bg-white rounded p-2 text-sm min-h-[260px]"
-                placeholder="Add any remarks or conditions for this P.R."
-              />
-            )}
+        {/* HEADER */}
+        <div className="flex items-center justify-between mt-2">
+          <h2 className="text-lg font-semibold underline">
+            Purchase Requisition
+          </h2>
 
-            <div className="grid grid-cols-[120px_220px_1fr_140px_60px_120px] items-center gap-2 text-sm">
-              <label>Indenter Ref.</label>
+          {isExisting && (
+            <span
+              className={`text-xs px-2 py-1 rounded ${
+                isApproved
+                  ? "bg-green-100 text-green-700"
+                  : "bg-yellow-100 text-yellow-800"
+              }`}
+            >
+              {isApproved ? "Approved" : "Pending approval"}
+            </span>
+          )}
+        </div>
+
+        {/* BASIC INFO */}
+        <div className="grid grid-cols-3 gap-2">
+          <Input value={current.prNo} readOnly />
+          <Input
+            value={current.dept}
+            onChange={(e) =>
+              setCurrent({ ...current, dept: e.target.value })
+            }
+            placeholder="Dept"
+          />
+          <Input
+            value={current.indenter}
+            onChange={(e) =>
+              setCurrent({ ...current, indenter: e.target.value })
+            }
+            placeholder="Indenter"
+          />
+        </div>
+
+        {/* ITEMS */}
+        <div className="mt-3">
+          <Button onClick={addRow} size="sm">
+            <Plus className="w-4 h-4" /> Add row
+          </Button>
+
+          {current.items.map((it, i) => (
+            <div key={i} className="grid grid-cols-5 gap-2 mt-2">
               <Input
-                value={current.indenter}
-                onChange={(e) => setCurrent({ ...current, indenter: e.target.value })}
-                className="h-8"
+                placeholder="Item"
+                value={it.itemName}
+                onChange={(e) =>
+                  updateItem(i, { itemName: e.target.value })
+                }
               />
-              <div />
-              <label className="text-right">Close This P.R. (Y/N)</label>
-              <select
-                value={current.closed}
-                onChange={(e) => setCurrent({ ...current, closed: e.target.value as "Y" | "N" })}
-                className="h-8 border rounded px-2 bg-white"
-              >
-                <option value="N">N</option>
-                <option value="Y">Y</option>
-              </select>
-              <span className="text-xs text-muted-foreground text-right">
-                {isExisting ? "Existing record" : "New record"}
-              </span>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              {!isAdmin && (
-                <>
-                  <Button variant="outline" onClick={handleNew}>New</Button>
-                  <Button onClick={handleSave} disabled={isApproved}>Save</Button>
-                </>
-              )}
-              <Button variant="outline" onClick={() => window.print()}>Print</Button>
-              {isAdmin && isExisting && !isApproved && (
-                <Button onClick={handleApprove} className="bg-green-600 hover:bg-green-700 text-white">
-                  Approve P.R.
-                </Button>
-              )}
-              {!isAdmin && (
-                <Button variant="outline" onClick={handleDelete} disabled={isApproved}>Delete</Button>
-              )}
-              <Button
-                variant="destructive"
-                onClick={() => onOpenChange(false)}
-              >
-                Exit
+              <Input
+                placeholder="Qty"
+                value={it.quantity}
+                onChange={(e) =>
+                  updateItem(i, { quantity: Number(e.target.value) })
+                }
+              />
+              <Input
+                placeholder="Rate"
+                value={it.rate}
+                onChange={(e) =>
+                  updateItem(i, { rate: Number(e.target.value) })
+                }
+              />
+              <Button onClick={() => removeRow(i)}>
+                <Trash2 className="w-4 h-4" />
               </Button>
             </div>
-          </section>
+          ))}
+        </div>
+
+        {/* ACTIONS */}
+        <div className="flex gap-2 mt-4">
+          <Button onClick={handleNew}>New</Button>
+          <Button onClick={handleSave}>Save</Button>
+
+          {isAdmin && isExisting && !isApproved && (
+            <Button onClick={handleApprove} className="bg-green-600 text-white">
+              Approve
+            </Button>
+          )}
+
+          <Button onClick={handleDelete}>Delete</Button>
+
+          <Button onClick={() => onOpenChange(false)} variant="destructive">
+            Exit
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

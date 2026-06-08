@@ -55,6 +55,7 @@ export interface ModuleAction {
   icon: LucideIcon;
   action:
     | "pr"
+    | "po"
     | "mrr"
     | "options"
     | "exit"
@@ -72,7 +73,9 @@ export function getModuleActions(id: ModuleId): ModuleAction[] {
   switch (id) {
     case "purchase":
       return [
-        { label: "General P.O", icon: FileText, action: "pr" },
+        { label: "Purchase Requisition", icon: FileText, action: "pr" },
+
+    { label: "General P.O", icon: FileCheck2, action: "po" },
         { label: "Day Wise Schedule", icon: CalendarDays, action: "options" },
         { label: "Weekly Schedule", icon: CalendarRange, action: "options" },
         { label: "Purchase MIS", icon: BarChart3, action: "options" },

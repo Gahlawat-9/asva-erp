@@ -1,3 +1,4 @@
+import axios from "axios";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -23,15 +24,42 @@ function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const user = login(username, password);
-    if (!user) {
-      toast.error("Invalid credentials. Try admin/admin or rahul/rahul.");
-      return;
-    }
+  const submit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  try {
+    const res = await axios.post(
+  "https://asva-erp.onrender.com/api/auth/login",
+  {
+    username,
+    password,
+  }
+);
+    localStorage.setItem(
+      "factory_session",
+      JSON.stringify(res.data.user)
+    );
+
+    localStorage.setItem(
+      "factory_token",
+      res.data.token
+    );
+
+    window.dispatchEvent(
+      new Event("factory-auth")
+    );
+
+    toast.success("Login successful");
+
     navigate({ to: "/dashboard" });
-  };
+
+  } catch (err: any) {
+    toast.error(
+      err?.response?.data?.message ||
+      "Invalid credentials"
+    );
+  }
+};
 
   return (
     <div

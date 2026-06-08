@@ -1,3 +1,4 @@
+import axios from "axios";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,12 +15,17 @@ interface IssueItem {
 }
 
 interface Issue {
+  _id?: string;
+
   issueNo: string;
   date: string;
   department: string;
   issuedBy: string;
+
   status: "pending" | "completed";
+
   items: IssueItem[];
+
   remarks: string;
 }
 
@@ -32,26 +38,23 @@ interface StockItem {
   minStock: number;
 }
 
-const STORAGE = "factory_issues";
+const API = "https://asva-erp.onrender.com/api";
 
-function loadIssues(): Issue[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE) ?? "[]");
-  } catch {
-    return [];
-  }
+
+async function loadIssues(): Promise<Issue[]> {
+  const res = await axios.get(
+    `${API}/issues`
+  );
+
+  return res.data;
 }
 
-function saveIssues(data: Issue[]) {
-  localStorage.setItem(STORAGE, JSON.stringify(data));
-}
+async function loadStock(): Promise<StockItem[]> {
+  const res = await axios.get(
+    `${API}/stock`
+  );
 
-function loadStock(): StockItem[] {
-  try {
-    return JSON.parse(localStorage.getItem("factory_stock_master") ?? "[]");
-  } catch {
-    return [];
-  }
+  return res.data;
 }
 
 function nextIssueNo(existing: Issue[]) {
@@ -103,30 +106,40 @@ export function IssueDialog({
     remarks: "",
   });
 
-  useEffect(() => {
+ useEffect(() => {
 
-    if (open) {
+  const fetchData = async () => {
 
-      const loadedIssues = loadIssues();
+    if (!open) return;
 
-      setIssues(loadedIssues);
-      setStock(loadStock());
+    const loadedIssues =
+      await loadIssues();
 
-      setCurrent({
-        issueNo: nextIssueNo(loadedIssues),
-        date: todayStr(),
-        department: "",
-        issuedBy: "STORE MANAGER",
-        status: "pending",
-        items: [emptyItem()],
-        remarks: "",
-      });
+    const loadedStock =
+      await loadStock();
 
-      setIsExisting(false);
+    setIssues(loadedIssues);
+    console.log("STOCK DATA:", loadedStock);
 
-    }
 
-  }, [open]);
+    setStock(loadedStock);
+
+    setCurrent({
+      issueNo: nextIssueNo(loadedIssues),
+      date: todayStr(),
+      department: "",
+      issuedBy: "STORE MANAGER",
+      status: "pending",
+      items: [emptyItem()],
+      remarks: "",
+    });
+
+    setIsExisting(false);
+  };
+
+  fetchData();
+
+}, [open]);
 
   const updateItem = (
     i: number,
@@ -183,139 +196,97 @@ export function IssueDialog({
 
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+
+  try {
 
     if (!current.department.trim()) {
       toast.error("Enter department");
       return;
     }
 
-    if (!current.items.some((i) => i.itemCode)) {
+    if (!current.items.some(i => i.itemCode)) {
       toast.error("Add at least one item");
       return;
     }
 
-    const next = isExisting
-      ? issues.map((p) =>
-          p.issueNo === current.issueNo ? current : p
-        )
-      : [...issues, current];
+    const res = await axios.post(
+      `${API}/issues`,
+      current
+    );
 
-    saveIssues(next);
+    const saved = res.data;
 
-    setIssues(next);
+    const refreshed =
+      await loadIssues();
+
+    setIssues(refreshed);
+
+    setCurrent(saved);
+
     setIsExisting(true);
 
     toast.success("Issue saved");
 
-  };
+  } catch {
 
-  const handleComplete = () => {
+    toast.error(
+      "Failed to save issue"
+    );
 
-    const updatedStock = [...stock];
+  }
 
-    for (const item of current.items) {
+};
 
-      const qty = Number(item.issueQty || 0);
+  const handleComplete = async () => {
 
-      const stockItem = updatedStock.find(
-        (s) => s.itemCode === item.itemCode
+  try {
+
+    if (!current._id) {
+
+      toast.error(
+        "Save issue first"
       );
 
-      if (!stockItem) continue;
-
-      if (qty > stockItem.currentStock) {
-
-        toast.error(
-          `Insufficient stock for ${stockItem.itemName}`
-        );
-
-        return;
-      }
-
+      return;
     }
 
-    current.items.forEach((item) => {
-
-      const qty = Number(item.issueQty || 0);
-
-      const stockItem = updatedStock.find(
-        (s) => s.itemCode === item.itemCode
-      );
-
-      if (!stockItem) return;
-
-      stockItem.currentStock -= qty;
-
-    });
-
-    localStorage.setItem(
-      "factory_stock_master",
-      JSON.stringify(updatedStock)
+    const res = await axios.put(
+      `${API}/issues/${current._id}/complete`
     );
 
-    // =========================
-    // LEDGER UPDATE
-    // =========================
+    const updated = res.data;
 
-    const ledger = JSON.parse(
-      localStorage.getItem("factory_stock_ledger") ?? "[]"
+    setIssues(
+      issues.map((i) =>
+        i._id === updated._id
+          ? updated
+          : i
+      )
     );
 
-    current.items.forEach((item) => {
-
-      const qty = Number(item.issueQty || 0);
-
-      if (!qty) return;
-
-      const stockItem = updatedStock.find(
-        (s) => s.itemCode === item.itemCode
-      );
-
-      ledger.push({
-        id: crypto.randomUUID(),
-        date: current.date,
-        itemCode: item.itemCode,
-        itemName: item.itemName,
-        transactionType: "ISSUE",
-        qty: -qty,
-        balanceAfter: stockItem?.currentStock || 0,
-        referenceNo: current.issueNo,
-        remarks: `Issued to ${current.department}`,
-      });
-
-    });
-
-    localStorage.setItem(
-      "factory_stock_ledger",
-      JSON.stringify(ledger)
-    );
-
-    // =========================
-
-    const updated: Issue = {
-      ...current,
-      status: "completed",
-    };
-
-    const next = issues.map((i) =>
-      i.issueNo === updated.issueNo ? updated : i
-    );
-
-    saveIssues(next);
-
-    setIssues(next);
     setCurrent(updated);
 
-    toast.success("Material issued successfully");
+    toast.success(
+      "Material issued successfully"
+    );
 
-  };
+  } catch (err: any) {
+
+    toast.error(
+      err?.response?.data?.message ||
+      "Issue failed"
+    );
+
+  }
+
+};
 
   const openExisting = (issue: Issue) => {
     setCurrent(issue);
     setIsExisting(true);
   };
-
+console.log(stock);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
 

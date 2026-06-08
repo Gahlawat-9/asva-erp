@@ -16,55 +16,19 @@ export type ModuleId =
   | "presales";
 
 export interface User {
+  _id?: string;
   username: string;
   displayName: string;
   company: string;
-  modules: ModuleId[] | "all";
+  modules: string[];
+  role?: string;
 }
 
-const USERS: Record<string, { password: string; user: User }> = {
-  admin: {
-    password: "admin",
-    user: { username: "admin", displayName: "admin", company: "ASVA", modules: "all" },
-  },
-  rahul: {
-    password: "rahul",
-    user: {
-      username: "rahul",
-      displayName: "Rahul (Purchase Dept.)",
-      company: "ASVA",
-      modules: ["purchase", "inventory"],
-    },
-  },
-  finance: {
-    password: "finance",
-    user: {
-      username: "finance",
-      displayName: "Anita (Finance)",
-      company: "ASVA",
-      modules: ["finance", "gst", "mis"],
-    },
-  },
-  production: {
-    password: "production",
-    user: {
-      username: "production",
-      displayName: "Aman (Manufacturing)",
-      company: "ASVA",
-      modules: ["manufacturing"],
-    },
-  },
-};
+
 
 const KEY = "factory_session";
 
-export function login(username: string, password: string): User | null {
-  const entry = USERS[username.toLowerCase()];
-  if (!entry || entry.password !== password) return null;
-  localStorage.setItem(KEY, JSON.stringify(entry.user));
-  window.dispatchEvent(new Event("factory-auth"));
-  return entry.user;
-}
+
 
 export function logout() {
   localStorage.removeItem(KEY);
@@ -82,22 +46,57 @@ export function getUser(): User | null {
   }
 }
 
-export function hasModule(user: User | null, id: ModuleId): boolean {
+export function hasModule(
+  user: User | null,
+  id: ModuleId
+): boolean {
   if (!user) return false;
-  if (user.modules === "all") return true;
-  return user.modules.includes(id);
+
+  if (
+    Array.isArray(user.modules) &&
+    user.modules.includes("all")
+  ) {
+    return true;
+  }
+
+  return (
+    Array.isArray(user.modules) &&
+    user.modules.includes(id)
+  );
 }
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(() => getUser());
+  const [user, setUser] =
+    useState<User | null>(null);
+
   useEffect(() => {
-    const onChange = () => setUser(getUser());
-    window.addEventListener("factory-auth", onChange);
-    window.addEventListener("storage", onChange);
+    const onChange = () =>
+      setUser(getUser());
+
+    onChange();
+
+    window.addEventListener(
+      "factory-auth",
+      onChange
+    );
+
+    window.addEventListener(
+      "storage",
+      onChange
+    );
+
     return () => {
-      window.removeEventListener("factory-auth", onChange);
-      window.removeEventListener("storage", onChange);
+      window.removeEventListener(
+        "factory-auth",
+        onChange
+      );
+
+      window.removeEventListener(
+        "storage",
+        onChange
+      );
     };
   }, []);
+
   return user;
 }

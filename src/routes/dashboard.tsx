@@ -3,6 +3,7 @@ import { AppFooter, AppHeader } from "@/components/AppHeader";
 import { FactoryLogo } from "@/components/FactoryLogo";
 import { MODULES, getModuleLabel } from "@/lib/modules";
 import { getUser, hasModule, useAuth } from "@/lib/auth";
+import { useNavigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/dashboard")({
   beforeLoad: () => {
@@ -19,6 +20,7 @@ export const Route = createFileRoute("/dashboard")({
 
 function Dashboard() {
   const user = useAuth() ?? getUser();
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -54,12 +56,20 @@ function Dashboard() {
               </div>
             );
             return allowed ? (
-              <Link key={m.id} to="/module/$moduleId" params={{ moduleId: m.id }} className="block">
-                {Inner}
-              </Link>
-            ) : (
-              <div key={m.id}>{Inner}</div>
-            );
+  <button
+    key={m.id}
+    className="block w-full text-left"
+    onClick={() => {
+  console.log("CLICKED", m.id);
+
+  window.location.href = `/module/${m.id}`;
+}}
+  >
+    {Inner}
+  </button>
+) : (
+  <div key={m.id}>{Inner}</div>
+);
           })}
           <div className="border-t pt-3 flex justify-center">
             <FactoryLogo />
