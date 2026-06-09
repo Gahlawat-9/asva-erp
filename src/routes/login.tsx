@@ -25,6 +25,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
 
   const submit = async (e: React.FormEvent) => {
+    alert("submit called");
   e.preventDefault();
 
   try {
