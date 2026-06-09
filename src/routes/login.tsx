@@ -35,6 +35,8 @@ function LoginPage() {
     password,
   }
 );
+
+console.log("LOGIN RESPONSE", res.data);
     localStorage.setItem(
       "factory_session",
       JSON.stringify(res.data.user)
