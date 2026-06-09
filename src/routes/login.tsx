@@ -96,7 +96,7 @@ console.log("LOGIN RESPONSE", res.data);
           className="h-10"
         />
         <Button type="submit" className="w-full h-11 text-base">
-          Log in to Factory ERP
+          Log in to Factory ERP 123
         </Button>
         <div className="flex justify-center gap-3 text-sm text-primary pt-1">
           <button type="button" className="hover:underline font-medium">Forgot password</button>
