@@ -25,6 +25,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
 
   const submit = async (e: React.FormEvent) => {
+    console.log("SUBMIT FIRED");
     alert("submit called");
   e.preventDefault();
 
@@ -36,6 +37,8 @@ function LoginPage() {
     password,
   }
 );
+
+console.log("LOGIN PAGE JS EXECUTED");
 
 console.log("LOGIN RESPONSE", res.data);
     localStorage.setItem(
