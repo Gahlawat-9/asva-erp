@@ -48,7 +48,7 @@ export function StockMasterDialog({
   // ================= LOAD FROM BACKEND =================
   useEffect(() => {
      const load = () => {
-    fetch("http://localhost:5000/api/stock")
+    fetch("https://asva-erp.onrender.com/api/stock")
       .then(res => res.json())
       .then(setStock);
   };
