@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FactoryLogo } from "@/components/FactoryLogo";
-import { login } from "@/lib/auth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
@@ -17,6 +16,8 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+console.log("Login route loaded", typeof window);
+
 function LoginPage() {
   const navigate = useNavigate();
   const [company] = useState("ASVA");
@@ -24,46 +25,45 @@ function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
+  console.log("LOGIN COMPONENT RENDERED", typeof window);
   const submit = async (e: React.FormEvent) => {
-    console.log("SUBMIT FIRED");
-    alert("submit called");
   e.preventDefault();
+
+  alert("SUBMIT FIRED");
 
   try {
     const res = await axios.post(
-  "https://asva-erp.onrender.com/api/auth/login",
-  {
-    username,
-    password,
-  }
+      "https://asva-erp.onrender.com/api/auth/login",
+      {
+        username,
+        password,
+      }
+    );
+
+    console.log(res.data);
+
+   localStorage.setItem(
+  "factory_session",
+  JSON.stringify(res.data.user)
 );
 
-console.log("LOGIN PAGE JS EXECUTED");
+localStorage.setItem(
+  "token",
+  res.data.token
+);
 
-console.log("LOGIN RESPONSE", res.data);
-    localStorage.setItem(
-      "factory_session",
-      JSON.stringify(res.data.user)
-    );
+window.dispatchEvent(
+  new Event("factory-auth")
+);
 
-    localStorage.setItem(
-      "factory_token",
-      res.data.token
-    );
+    alert("LOGIN SUCCESS");
 
-    window.dispatchEvent(
-      new Event("factory-auth")
-    );
-
-    toast.success("Login successful");
-
-    navigate({ to: "/dashboard" });
-
-  } catch (err: any) {
-    toast.error(
-      err?.response?.data?.message ||
-      "Invalid credentials"
-    );
+    navigate({
+      to: "/dashboard",
+    });
+  } catch (err) {
+    console.error(err);
+    alert("LOGIN FAILED");
   }
 };
 
@@ -76,8 +76,8 @@ console.log("LOGIN RESPONSE", res.data);
       }}
     >
       <form
-        onSubmit={submit}
-        className="bg-white shadow-2xl w-full max-w-md p-8 space-y-4"
+        onSubmit={(e) => submit(e)}
+  className="bg-white shadow-2xl w-full max-w-md p-8 space-y-4"
       >
         <div className="flex justify-center mb-4">
           <FactoryLogo />
@@ -98,9 +98,16 @@ console.log("LOGIN RESPONSE", res.data);
           onChange={(e) => setPassword(e.target.value)}
           className="h-10"
         />
-        <Button type="submit" className="w-full h-11 text-base">
-          Log in to Factory ERP 123
-        </Button>
+        <button type="submit" 
+          style={{
+            width: "100%",
+            height: "40px",
+            background: "red",
+            color: "white",
+          }}
+        >
+          TEST LOGIN
+        </button>
         <div className="flex justify-center gap-3 text-sm text-primary pt-1">
           <button type="button" className="hover:underline font-medium">Forgot password</button>
           <span className="text-muted-foreground">|</span>

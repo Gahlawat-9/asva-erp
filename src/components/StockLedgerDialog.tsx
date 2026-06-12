@@ -35,7 +35,7 @@ export function StockLedgerDialog({
   // ================= LOAD FROM BACKEND =================
   useEffect(() => {
     const load = () => {
-    fetch("http://localhost:5000/api/stockledger")
+    fetch("https://asva-erp.onrender.com/api/stockledger")
       .then(res => res.json())
       .then(setEntries);
   };

@@ -103,6 +103,9 @@ function RootShell({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <div style={{color: "red"}}>
+          TEST ROOT SHELL
+        </div>
         <Scripts />
       </body>
     </html>
